@@ -22,7 +22,7 @@ def upgrade():
         batch_op.add_column(sa.Column('last_name', sa.String(length=120), nullable=True))
         batch_op.add_column(sa.Column('address', sa.String(length=120), nullable=True))
         batch_op.add_column(sa.Column('country', sa.String(length=120), nullable=True))
-        batch_op.drop_constraint('user_name_key', type_='unique')
+        #batch_op.drop_constraint('user_name_key', type_='unique')
 
     # ### end Alembic commands ###
 
