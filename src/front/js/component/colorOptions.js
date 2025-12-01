@@ -6,8 +6,8 @@ const ColorOptions = ({ colors, selectedColor, onColorSelect }) => {
       {colors.map((color) => (
         <div
           key={color.id}
-          className={`circle ${selectedColor === color.name ? "active" : ""}`}
-          onClick={() => onColorSelect(color.name)}
+          className={`circle ${selectedColor?.id === color.id ? "active" : ""}`}
+          onClick={() => onColorSelect(color)}
         >
           <div
             className="circle-color"

@@ -1,0 +1,110 @@
+/* checkout.css */
+.checkout {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+.checkout h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.cart-item img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.cart-item div.flex-grow-1 {
+  margin-left: 1rem;
+  flex: 1;
+}
+
+.cart-item h5 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.cart-item p {
+  margin: 0.2rem 0;
+}
+
+.cart-item button {
+  border: none;
+  padding: 4px 8px;
+  margin: 0 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cart-item button:hover {
+  opacity: 0.8;
+}
+
+.cart-item button.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.cart-item button.btn-danger:hover {
+  opacity: 0.9;
+}
+
+.cart-item button:not(.btn-danger) {
+  background-color: #007bff;
+  color: white;
+}
+
+.cart-item button:not(.btn-danger):hover {
+  opacity: 0.9;
+}
+
+.checkout h4 {
+  text-align: right;
+  margin-top: 1rem;
+}
+
+.checkout button.btn-success {
+  display: block;
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 1rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.checkout button.btn-success:hover {
+  opacity: 0.9;
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+  .cart-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .cart-item div.flex-grow-1 {
+    margin-left: 0;
+    margin-top: 0.5rem;
+    width: 100%;
+  }
+  .cart-item .d-flex {
+    flex-wrap: wrap;
+  }
+}

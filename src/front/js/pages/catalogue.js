@@ -267,7 +267,7 @@ export const Catalogue = (props) => {
           <div className="row m-0 p-0">
             <img
               className="p-0"
-              src="https://new-ella-demo.myshopify.com/cdn/shop/collections/category-default-1.jpg?v=1646985103&width=1100"
+              src="https://preview.thenewsmarket.com/Previews/ADID/StillAssets/1920x1440/698793_v2.jpg"
             />
           </div>
           <div>

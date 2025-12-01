@@ -3,13 +3,13 @@ import React from "react";
 const SizeOptions = ({ sizes, selectedSize, onSizeSelect }) => {
   return (
     <div className="d-flex mb-3">
-      {sizes.map((size, index) => (
+      {sizes.map((size) => (
         <p
-          key={index}
-          className={`size-text ${selectedSize === size ? "active" : ""}`}
+          key={size.id}
+          className={`size-text ${selectedSize?.id === size.id ? "active" : ""}`}
           onClick={() => onSizeSelect(size)}
         >
-          {size}
+          {size.name}
         </p>
       ))}
     </div>

@@ -1,264 +1,198 @@
 import React, { useState, useEffect, useContext } from "react";
-import PropTypes from "prop-types";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Context } from "../store/appContext";
 
 import "../../styles/productDetails.css";
-
 import ColorOptions from "../component/colorOptions";
 import SizeOptions from "../component/sizeOptions";
+import { useCart } from "../store/CartContext";
 
 export const ProductDetails = () => {
   const { store, actions } = useContext(Context);
   const params = useParams();
-  // State variables
+  const navigate = useNavigate();
+
   const [productInfo, setProductInfo] = useState(null);
-  const [isFavorite, setIsFavorite] = useState();
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [newOrder, setNewOrder] = useState({
     id: params.theid,
     color: null,
     size: null,
-    quantity: 0,
+    quantity: 1,
     price: null,
     description: null,
-    termsPolicy: false,
+    img: null,
   });
-  const [showMessage, setShowMessage] = useState(false);
 
-  // Fetch colors by IDs
-  const fetchColors = async (colorIds) => {
-    try {
-      const fetchedColors = await actions.getColorsByIds(colorIds);
-      setColors(fetchedColors);
-    } catch (error) {
-      console.error("Error fetching colors:", error);
-    }
-  };
+  const { addToCart } = useCart();
 
-  // Fetch sizes by IDs
-  const fetchSizes = async (sizeIds) => {
-    try {
-      const fetchedSizes = await actions.getSizesByIds(sizeIds);
-      setSizes(fetchedSizes);
-    } catch (error) {
-      console.error("Error fetching sizes:", error);
-    }
-  };
-
-  // Fetch product data on mount
+  // Fetch product
   useEffect(() => {
-    const filters = {
-      product_id: params.theid,
-    };
-    actions.getProducts(filters);
-  }, []);
+    actions.getProducts({ product_id: params.theid });
+  }, [params.theid]);
 
-  // Update productInfo when store.products change
+  // Set product info
   useEffect(() => {
     if (store.products && store.products.length > 0) {
       setProductInfo(store.products[0]);
     }
   }, [store.products]);
 
-  // Check if the product is in user's favorites
-  useEffect(() => {
-    if (store.user && store.user.favorites.length > 0) {
-      const isProductFavorite = store.user.favorites.some(
-        (favorite) => favorite.product.id === store.products[0].id
-      );
-      setIsFavorite(isProductFavorite);
-    }
-  }, [store.user]);
-
-  // Fetch product sizes and colors and get price
+  // Fetch colors & sizes
   useEffect(() => {
     if (productInfo) {
-      const colorIdsList = productInfo.stock.map((item) => item.color_id);
-      const sizeIdsList = productInfo.stock.map((item) => item.size_id);
+      const colorIds = productInfo.stock.map((s) => s.color_id);
+      const sizeIds = productInfo.stock.map((s) => s.size_id);
 
-      setNewOrder((prevOrder) => ({
-        ...prevOrder,
+      actions.getColorsByIds(colorIds).then(setColors);
+      actions.getSizesByIds(sizeIds).then(setSizes);
+    }
+  }, [productInfo, actions]);
+
+  // Auto-select first available color & size
+  useEffect(() => {
+    if (colors.length > 0 && sizes.length > 0 && productInfo) {
+      const firstColor = colors[0];
+      const firstSize = sizes[0];
+      const stockItem = productInfo.stock.find(
+        (s) => s.color_id === firstColor.id && s.size_id === firstSize.id
+      );
+      const stockQty = stockItem ? stockItem.quantity : 0;
+
+      setNewOrder({
+        ...newOrder,
+        color: firstColor,
+        size: firstSize,
+        quantity: stockQty > 0 ? 1 : 0,
         price: productInfo.price,
         description: productInfo.description,
         img: productInfo.img,
-      }));
-
-      // Fetch colors and sizes
-      fetchColors(colorIdsList);
-      fetchSizes(sizeIdsList);
+      });
     }
-  }, [productInfo]);
+  }, [colors, sizes, productInfo]);
 
-  // Handle color selection
-  const handleColorSelect = (color) => {
-    setNewOrder((prevNewOrder) => ({
-      ...prevNewOrder,
-      color: color,
+  const handleColorSelect = (colorObj) => {
+    if (!newOrder.size || !productInfo) return;
+
+    const stockItem = productInfo.stock.find(
+      (s) => s.color_id === colorObj.id && s.size_id === newOrder.size.id
+    );
+    const stockDisponible = stockItem ? stockItem.quantity : 0;
+
+    setNewOrder((prev) => ({
+      ...prev,
+      color: colorObj,
+      quantity: stockDisponible > 0 ? 1 : 0,
     }));
   };
 
-  // Handle size selection
-  const handleSizeSelect = (size) => {
-    setNewOrder((prevOrder) => ({
-      ...prevOrder,
-      size: size,
+  const handleSizeSelect = (sizeObj) => {
+    if (!newOrder.color || !productInfo) return;
+
+    const stockItem = productInfo.stock.find(
+      (s) => s.color_id === newOrder.color.id && s.size_id === sizeObj.id
+    );
+    const stockDisponible = stockItem ? stockItem.quantity : 0;
+
+    setNewOrder((prev) => ({
+      ...prev,
+      size: sizeObj,
+      quantity: stockDisponible > 0 ? 1 : 0,
     }));
   };
 
-  // Handle quantity change
   const handleQuantityChange = (change) => {
-    if (newOrder.quantity + change >= 0) {
-      setNewOrder((prevOrder) => ({
-        ...prevOrder,
-        quantity: prevOrder.quantity + change,
-      }));
+    if (!productInfo || !newOrder.color || !newOrder.size) return;
+
+    const stockItem = productInfo.stock.find(
+      (s) => s.color_id === newOrder.color.id && s.size_id === newOrder.size.id
+    );
+
+    if (!stockItem || stockItem.quantity === 0) {
+      alert("⚠ Este color/talla no tiene stock");
+      return;
     }
+
+    const nuevaCantidad = newOrder.quantity + change;
+    if (nuevaCantidad < 1 || nuevaCantidad > stockItem.quantity) return;
+
+    setNewOrder((prev) => ({ ...prev, quantity: nuevaCantidad }));
   };
 
-  // Handle add to cart
   const handleAddToCart = () => {
-    const existingCart = JSON.parse(localStorage.getItem("cart")) || [];
-    const updatedCart = [...existingCart, newOrder];
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
-    actions.getCartFromStorage();
+    if (!newOrder.color || !newOrder.size) {
+      alert("Selecciona color y talla");
+      return;
+    }
+
+    const stockItem = productInfo.stock.find(
+      (s) => s.color_id === newOrder.color.id && s.size_id === newOrder.size.id
+    );
+
+    const stockDisponible = stockItem ? stockItem.quantity : 0;
+
+    if (newOrder.quantity > stockDisponible) {
+      alert(`⚠ No puedes agregar más. Stock disponible: ${stockItem.quantity}`);
+      return;
+    }
+
+    addToCart({
+      product: productInfo,
+      color: newOrder.color,
+      size: newOrder.size,
+      quantity: newOrder.quantity,
+      stockQuantity: stockDisponible
+    });
+
+    alert("Producto agregado al carrito");
   };
 
-  return (
-    <>
-      {productInfo ? (
-        <div className="product-detail container">
-          <div className="row">
-            <div className="link-tree pt-4 ms-2">
-              <p>home - {productInfo.name}</p>
-            </div>
-          </div>
+  const handleBuyNow = () => {
+    handleAddToCart(); // ✅ Reutilizamos la misma validación
+    navigate("/checkout");
+  };
 
-          <div className="row pt-3 g-0">
-            <div className="col-md-7">
-              <div className="foto pe-2">
-                <img src={productInfo.img} className="img-fluid" />
-              </div>
-            </div>
-            <div className="col-md-5 ps-5">
-              <h2>{productInfo.name}</h2>
+  return productInfo ? (
+    <div className="product-detail container">
+      <div className="row">
+        <div className="link-tree pt-4 ms-2">
+          <p>home - {productInfo.name}</p>
+        </div>
+      </div>
 
-              <div className="d-flex align-items-end py-3">
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star me-2"></i>
-                <h5 className="fw-light m-0">1 Review</h5>
-              </div>
-
-              <h5 className="fw-light mb-3">{productInfo.description}</h5>
-
-              <p>Collection: Lorem Ipsum</p>
-              <p>Href: {productInfo.reference}</p>
-              <p>Availability: Lorem Ipsum</p>
-
-              <h2 className="my-3">$ {productInfo.price}</h2>
-
-              <p className="fw-bold">Color: {newOrder.color}</p>
-              <ColorOptions
-                colors={colors.flat()}
-                selectedColor={newOrder.color}
-                onColorSelect={handleColorSelect}
-              />
-
-              <p className="fw-bold">
-                Size: {newOrder.size !== null ? newOrder.size : ""}
-              </p>
-              <SizeOptions
-                sizes={sizes}
-                selectedSize={newOrder.size}
-                onSizeSelect={handleSizeSelect}
-              />
-
-              <p className="fw-bold">Quantity: {newOrder.quantity}</p>
-              <div className="d-flex mb-3">
-                <p
-                  className={"size-text"}
-                  onClick={() => handleQuantityChange(-1)}
-                >
-                  -
-                </p>
-                <p className={"size-text"}>{newOrder.quantity}</p>
-                <p
-                  className={"size-text"}
-                  onClick={() => handleQuantityChange(1)}
-                >
-                  +
-                </p>
-              </div>
-
-              <div className="d-flex">
-                <div className="col-9">
-                  <p className="button-black" onClick={handleAddToCart}>
-                    ADD TO CART
-                  </p>
-                </div>
-
-                <div className="col-2">
-                  {/*************** FAVORITE HEART ********************/}
-                  {store.user && (
-                    <i
-                      className={`fa-${
-                        isFavorite ? "solid" : "regular"
-                      } fa-heart p-2`}
-                      onClick={() =>
-                        isFavorite
-                          ? actions.deleteFavorite(store.products[0].id)
-                          : actions.addFavorite(store.products[0].id)
-                      }
-                    ></i>
-                  )}
-                </div>
-              </div>
-
-              <div className="d-flex align-items-center">
-                <input
-                  className={`form-check-input ${
-                    newOrder.termsPolicy === true ? "checked" : ""
-                  }`}
-                  type="checkbox"
-                  value="None"
-                  onClick={() =>
-                    setNewOrder((prevOrder) => ({
-                      ...prevOrder,
-                      termsPolicy: true,
-                    }))
-                  }
-                />
-                <h5 className="fw-light ms-2 mb-0">
-                  I agree withTerms & Conditions
-                </h5>
-              </div>
-
-              <p
-                className={`my-3 ${
-                  newOrder.termsPolicy === true
-                    ? "button-blue-dark"
-                    : "button-blue"
-                }`}
-                onClick={() => setShowMessage(true)}
-              >
-                BUY
-              </p>
-              {showMessage && !newOrder.termsPolicy && (
-                <p className="mandatory">*You must accept terms and policy</p>
-              )}
-              {showMessage && newOrder.termsPolicy && (
-                <p>Payment not available yet</p>
-              )}
-            </div>
+      <div className="row pt-3 g-0">
+        <div className="col-md-7">
+          <div className="foto pe-2">
+            <img src={productInfo.img} className="img-fluid" alt={productInfo.name} />
           </div>
         </div>
-      ) : (
-        <h2>Loading...</h2>
-      )}
-    </>
+        <div className="col-md-5 ps-5">
+          <h2>{productInfo.name}</h2>
+          <h5 className="fw-light mb-3">{productInfo.description}</h5>
+          <h2 className="my-3">$ {productInfo.price}</h2>
+
+          <p className="fw-bold">Color: {newOrder.color?.name || ""}</p>
+          <ColorOptions colors={colors} selectedColor={newOrder.color?.id} onColorSelect={handleColorSelect} />
+
+          <p className="fw-bold">Size: {newOrder.size?.name || ""}</p>
+          <SizeOptions sizes={sizes} selectedSize={newOrder.size?.id} onSizeSelect={handleSizeSelect} />
+
+          <p className="fw-bold">Quantity: {newOrder.quantity}</p>
+          <div className="d-flex mb-3">
+            <p className="size-text" onClick={() => handleQuantityChange(-1)}>-</p>
+            <p className="size-text">{newOrder.quantity}</p>
+            <p className="size-text" onClick={() => handleQuantityChange(1)}>+</p>
+          </div>
+
+          <div className="d-flex mt-2">
+            <p className="button-black me-3" onClick={handleAddToCart}>ADD TO CART</p>
+            <p className="button-black" onClick={handleBuyNow}>BUY NOW</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <h2>Loading...</h2>
   );
 };

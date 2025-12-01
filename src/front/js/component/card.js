@@ -26,7 +26,7 @@ export const Card = ({ item }) => {
           {/*************** PHOTO ********************/}
           <Link to={"/productDetails/" + item.id}>
             <img
-              src="https://new-ella-demo.myshopify.com/cdn/shop/products/image16xxl_fc9c3985-7db2-4101-b11a-49cd512ce9bc.jpg?v=1658136572"
+              src={item.img}
               className="card-img-top"
               alt="..."
             />

@@ -2,12 +2,21 @@
 This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
 from flask import Flask, request, jsonify, url_for, Blueprint
-from api.models import db, User, Product, Collection, Size, Color, User, Favorites, Stock
+from api.models import db, User, Product, Collection, Size, Color, Favorites, Stock, Order, SupportTicket, Message
 from api.utils import generate_sitemap, APIException
 # Token
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
+
+from datetime import datetime
+import stripe
+import os
+
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+
 
 api = Blueprint('api', __name__)
 
@@ -169,26 +178,49 @@ def login_user():
 def add_cart_item():
     user_id = get_jwt_identity()
     product_id = request.json.get('product_id')
-    color = request.json.get('color')
-    size = request.json.get('size')
+    color_id = request.json.get('color_id')
+    size_id = request.json.get('size_id')
     quantity = request.json.get('quantity')
 
-    if not product_id:
-        return jsonify(message='Product ID is required'), 400
+    if not all([product_id, color_id, size_id, quantity]):
+        return jsonify(message='Missing product, color, size or quantity'), 400
 
+    # 1. Verificar producto
     product = Product.query.get(product_id)
     if not product:
         return jsonify(message='Product not found'), 404
 
-    favorite = Favorites.query.filter_by(user_id=user_id, product_id=product_id).first()
-    if favorite:
-        return jsonify(message='Favorite already exists'), 409
+    # 2. Buscar stock específico del producto + talla + color
+    stock_entry = Stock.query.filter_by(
+        product_id=product_id,
+        color_id=color_id,
+        size_id=size_id
+    ).first()
 
-    favorite = Favorites(user_id=user_id, product_id=product_id)
-    db.session.add(favorite)
+    if not stock_entry:
+        return jsonify(message='Stock entry not found'), 404
+
+    # 3. Validar cantidad disponible
+    if quantity > stock_entry.quantity:
+        return jsonify(
+            message='Quantity exceeds available stock',
+            available_stock=stock_entry.quantity
+        ), 400
+
+    # 4. Registrar en tabla Order (cart)
+    order = Order(
+        user_id=user_id,
+        product_id=product_id,
+        color=str(color_id),
+        size=str(size_id),
+        quantity=quantity,
+        status='cart'
+    )
+
+    db.session.add(order)
     db.session.commit()
 
-    return jsonify(message='Favorite created successfully'), 201
+    return jsonify(message='Item added to cart successfully'), 201
 
 
 @api.route('/favorites', methods=['POST'])
@@ -349,3 +381,261 @@ def create_stock():
     db.session.commit()
 
     return jsonify(message='Stocks created successfully'), 201
+
+@api.route('/cart', methods=['GET'])
+@jwt_required()
+def get_cart():
+    user_id = get_jwt_identity()
+    cart_items = Order.query.filter_by(user_id=user_id, status='cart').all()
+    return jsonify({"cart": [item.serialize() for item in cart_items]}), 200
+
+@api.route('/check-stock', methods=['POST'])
+def check_stock():
+    product_id = request.json.get('product_id')
+    color_id = request.json.get('color_id')
+    size_id = request.json.get('size_id')
+    quantity = request.json.get('quantity')
+
+    stock_entry = Stock.query.filter_by(
+        product_id=product_id,
+        color_id=color_id,
+        size_id=size_id
+    ).first()
+
+    if not stock_entry:
+        return jsonify(message='Stock entry not found'), 404
+
+    if quantity > stock_entry.quantity:
+        return jsonify(
+            message='Quantity exceeds available stock',
+            available_stock=stock_entry.quantity
+        ), 400
+
+    return jsonify(message='OK', available_stock=stock_entry.quantity), 200
+
+
+@api.route('/tickets', methods=['POST'])
+@jwt_required()
+def create_ticket():
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+    subject = data.get('subject')
+    description = data.get('description', '')
+
+    if not subject:
+        return jsonify({'error': 'subject required'}), 400
+
+    ticket = SupportTicket(
+        subject=subject,
+        description=description,
+        creator_id=user_id,
+        status='open'
+    )
+    db.session.add(ticket)
+    db.session.commit()
+    return jsonify(ticket.serialize()), 201
+
+# ---- Agregar mensaje al ticket (cliente o consultor) ----
+@api.route('/tickets/<int:ticket_id>/messages', methods=['POST'])
+@jwt_required()
+def add_message(ticket_id):
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+    text = data.get('text')
+    if not text:
+        return jsonify({'error':'text required'}), 400
+
+    ticket = SupportTicket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({'error':'Ticket not found'}), 404
+
+    # Opcional: permisos (cliente puede escribir solo en sus tickets)
+    user = User.query.get(user_id)
+    if user.role == 'customer' and ticket.creator_id != user_id:
+        return jsonify({'error':'No autorizado'}), 403
+
+    msg = Message(ticket_id=ticket.id, sender_id=user_id, text=text)
+    db.session.add(msg)
+    ticket.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(msg.serialize()), 201
+
+# ---- Obtener mensajes de un ticket ----
+@api.route('/tickets/<int:ticket_id>/messages', methods=['GET'])
+@jwt_required()
+def get_ticket_messages(ticket_id):
+    user_id = get_jwt_identity()
+    ticket = SupportTicket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({'error':'Ticket not found'}), 404
+
+    user = User.query.get(user_id)
+    # permisos: customer ve sus tickets, consultant ve los asignados, admin ve todo
+    if user.role == 'customer' and ticket.creator_id != user_id:
+        return jsonify({'error':'No autorizado'}), 403
+    if user.role == 'consultant' and ticket.assignee_id != user_id:
+        return jsonify({'error':'No autorizado'}), 403
+
+    messages = Message.query.filter_by(ticket_id=ticket_id).order_by(Message.created_at.asc()).all()
+    return jsonify([m.serialize() for m in messages]), 200
+
+# ---- Listar tickets (según rol) ----
+@api.route('/tickets', methods=['GET'])
+@jwt_required()
+def list_tickets():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if user.role == 'admin':
+        tickets = SupportTicket.query.order_by(SupportTicket.updated_at.desc()).all()
+    elif user.role == 'consultant':
+        tickets = SupportTicket.query.filter_by(assignee_id=user_id).order_by(SupportTicket.updated_at.desc()).all()
+    else:  # customer
+        tickets = SupportTicket.query.filter_by(creator_id=user_id).order_by(SupportTicket.updated_at.desc()).all()
+    return jsonify([t.serialize() for t in tickets]), 200
+
+# ---- Asignar ticket (solo admin) ----
+@api.route('/tickets/<int:ticket_id>/assign', methods=['POST'])
+@jwt_required()
+def assign_ticket(ticket_id):
+    user_id = get_jwt_identity()
+    admin = User.query.get(user_id)
+    if admin.role != 'admin':
+        return jsonify({'error':'No autorizado'}), 403
+
+    data = request.get_json() or {}
+    assignee_id = data.get('assignee_id')
+    if not assignee_id:
+        return jsonify({'error':'assignee_id required'}), 400
+
+    consultant = User.query.get(assignee_id)
+    if not consultant or consultant.role != 'consultant':
+        return jsonify({'error':'Consultor inválido'}), 400
+
+    ticket = SupportTicket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({'error':'Ticket not found'}), 404
+
+    ticket.assignee_id = assignee_id
+    ticket.status = 'pending'
+    ticket.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(ticket.serialize()), 200
+
+# ---- Cambiar estado del ticket (consultant/admin) ----
+@api.route('/tickets/<int:ticket_id>/status', methods=['POST'])
+@jwt_required()
+def change_ticket_status(ticket_id):
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    data = request.get_json() or {}
+    new_status = data.get('status')
+    if new_status not in ('open','pending','resolved','closed'):
+        return jsonify({'error':'Invalid status'}), 400
+
+    ticket = SupportTicket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({'error':'Ticket not found'}), 404
+
+    # Admin o consultor asignado puede cambiar estado
+    if user.role != 'admin' and not (user.role == 'consultant' and ticket.assignee_id == user_id):
+        return jsonify({'error':'No autorizado'}), 403
+
+    ticket.status = new_status
+    ticket.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(ticket.serialize()), 200
+
+@api.route('/create_ticket', methods=['POST'])
+def create_ticket_api():
+    data = request.json
+
+    # Validar datos mínimos
+    if not data.get('creator_email') or not data.get('subject'):
+        return jsonify({'error': 'creator_email y subject son requeridos'}), 400
+
+    # Buscar creator
+    creator = User.query.filter_by(email=data['creator_email']).first()
+    if not creator:
+        return jsonify({'error': 'Creator email no encontrado'}), 404
+
+    # Buscar assignee si existe
+    assignee = None
+    if data.get('assignee_email'):
+        assignee_user = User.query.filter_by(email=data['assignee_email']).first()
+        if not assignee_user:
+            return jsonify({'error': 'Assignee email no encontrado'}), 404
+        if assignee_user.role != 'consultant':
+            return jsonify({'error': 'Assignee debe ser un consultor'}), 400
+        assignee = assignee_user
+
+    # Crear ticket
+    ticket = SupportTicket(
+        subject=data['subject'],
+        description=data.get('description', ''),
+        status="open",
+        creator_id=creator.id,
+        assignee_id=assignee.id if assignee else None,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(ticket)
+    db.session.commit()
+
+    # Crear mensaje inicial
+    message = Message(
+        ticket_id=ticket.id,
+        sender_id=creator.id,
+        text=data.get('description', ''),
+        created_at=datetime.utcnow()
+    )
+    db.session.add(message)
+    db.session.commit()
+
+    return jsonify({"msg": "Ticket creado con éxito", "ticket_id": ticket.id}), 201
+
+@api.route("/products/update-stock", methods=["POST"])
+def update_stock():
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception as e:
+        app.logger.error("Invalid JSON: %s", e)
+        return jsonify({"message": "JSON inválido"}), 400
+
+    # Validación y conversión a enteros (evita comparaciones fallidas por tipo)
+    try:
+        product_id = int(data.get("productId"))
+        color_id = int(data.get("colorId"))
+        size_id  = int(data.get("sizeId"))
+        quantity = int(data.get("quantityPurchased", 0))
+    except (TypeError, ValueError):
+        return jsonify({"message": "productId/colorId/sizeId/quantity invalid or missing"}), 400
+
+    if quantity <= 0:
+        return jsonify({"message": "quantityPurchased debe ser mayor que 0"}), 400
+
+    product = Product.query.filter_by(id=product_id).first()
+    if not product:
+        return jsonify({"message": "Producto no encontrado"}), 404
+
+    # Buscar en la lista de stock del producto (si product.stock es lista de objetos)
+    stock_item = next((s for s in product.stock if s.color_id == color_id and s.size_id == size_id), None)
+    if not stock_item:
+        return jsonify({"message": "Stock no encontrado"}), 404
+
+    # Reducir stock y prevenir negativos
+    original = stock_item.quantity
+    stock_item.quantity = max(stock_item.quantity - quantity, 0)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error("DB commit error: %s", e)
+        return jsonify({"message": "Error al actualizar DB"}), 500
+
+    return jsonify({
+        "message": "Stock actualizado",
+        "product_id": product_id,
+        "color_id": color_id,
+        "size_id": size_id,
+        "quantity_before": original,
+        "quantity_after": stock_item.quantity
+    }), 200

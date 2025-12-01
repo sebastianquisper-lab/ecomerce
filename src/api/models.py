@@ -1,4 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
 
 db = SQLAlchemy()
 
@@ -7,17 +9,22 @@ class User(db.Model):
     name = db.Column(db.String(120), unique=False, nullable=False)
     last_name = db.Column(db.String(120), unique=False, nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(80), unique=False, nullable=False)
+    password = db.Column(db.String(200), unique=False, nullable=False)
     address = db.Column(db.String(120), unique=False, nullable=True)
     country = db.Column(db.String(120), unique=False, nullable=True)
+    role = db.Column(db.String(20), default="customer", nullable=False)
+
     favorites = db.relationship('Favorites', backref='user')
     orders = db.relationship('Order', backref='user')
+    tickets_created = db.relationship('SupportTicket', backref='creator', foreign_keys='SupportTicket.creator_id')
+    tickets_assigned = db.relationship('SupportTicket', backref='assignee', foreign_keys='SupportTicket.assignee_id')
 
     def serialize(self):
         return {
             "id": self.id,
             "name": self.name,
             "email": self.email,
+            "role": self.role,
             "favorites": [favorite.serialize() for favorite in self.favorites],
             "orders": [order.serialize() for order in self.orders]
         }
@@ -141,4 +148,48 @@ class Order(db.Model):
                     'quantity': self.quantity
                 }
             ]
+        }
+    
+
+class SupportTicket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    subject = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="open")  # open | pending | closed | resolved
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # cliente que creó el ticket
+    assignee_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)   # consultor asignado
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = db.relationship('Message', backref='ticket', cascade="all, delete-orphan")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "subject": self.subject,
+            "description": self.description,
+            "status": self.status,
+            "creator": {"id": self.creator_id, "name": User.query.get(self.creator_id).name if self.creator_id else None},
+            "assignee": {"id": self.assignee_id, "name": User.query.get(self.assignee_id).name} if self.assignee_id else None,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "messages": [m.serialize() for m in self.messages]
+        }
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.Integer, db.ForeignKey('support_ticket.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    sender = db.relationship('User', backref=db.backref('messages_sent', lazy=True))
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "ticket_id": self.ticket_id,
+            "sender": {"id": self.sender_id, "name": User.query.get(self.sender_id).name},
+            "text": self.text,
+            "created_at": self.created_at.isoformat()
         }

@@ -1,34 +1,102 @@
-/********* Jumbotron-home ********/
+
 .jumbotron-home {
-  margin-top: 87px; /* Margin to push down the content below the fixed-top components */
-  background-image: url("https://new-ella-demo.myshopify.com/cdn/shop/files/slideshow-1.jpg?v=1632195167&width=1880");
-  background-size: cover; /* Make the background image responsive */
-  width: auto;
-  height: 550px;
-  text-align: justify;
+  margin-top: 87px; /* mantén si tienes un header fijo */
+  width: 100%;
+  min-height: 420px;
+  height: 60vh;            /* más flexible que height fijo */
+  max-height: 700px;
   display: flex;
-  align-items: center;
-}
-.bold {
-  font-weight: bold;
+  align-items: center;     /* centra vertical */
+  justify-content: center; /* centra horizontal */
+  text-align: center;
+  position: relative;
+
+  /* background */
+  background-image: url("https://brand.assets.adidas.com/image/upload/f_auto,q_auto:best,fl_lossy/if_w_gt_1920,w_1920/01_ss25_anthony_edwards_1_preloved_lime_launch_plp_banner_small_d_dbabeafac7.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: #fff; /* valor por defecto para hijos */
+  padding: 2rem 1rem;
+  box-sizing: border-box;
 }
 
-/********* Collections ********/
+/* Contenedor interno para limitar ancho del contenido */
+.jumbotron-home .jumbotron-content {
+  width: 100%;
+  max-width: 1100px;
+  padding: 0 1rem;
+}
+
+/* --------------------------
+   TIPOGRAFÍA
+---------------------------*/
+.jumbotron-home h1 {
+  font-size: 4rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin: 0 0 .6rem 0;
+  color: #fff !important;
+}
+
+.jumbotron-home .divider {
+  width: 60px;
+  margin: 0.5rem auto;
+  border-top: 2px solid #ffffff;
+}
+
+.jumbotron-home p {
+  font-size: 1.5rem;
+  font-weight: 300;
+  letter-spacing: 1px;
+  margin: 0.6rem 0 1.2rem 0;
+  color: #fff !important;
+}
+
+/* --------------------------
+   BUTTON (mantener comportamiento)
+---------------------------*/
+.button-black {
+  background-color: #000;
+  color: #fff;
+  border: 1px solid #000;
+  padding: 10px 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* Hover: fondo blanco + texto negro (texto no desaparece) */
+.button-black:hover {
+  background-color: #fff;
+  color: #000 !important;
+  border: 1px solid #000;
+}
+
+/* --------------------------
+   COLLECTIONS / IMAGE OVERLAY
+---------------------------*/
 .text-img {
   display: flex;
   justify-content: center;
   align-items: center;
   text-align: center;
   position: absolute;
+  inset: 0; /* shorthand para top/right/bottom/left: 0 */
 }
 
-/**** Image ZOOM ****/
 .zoom-img {
   overflow: hidden;
   position: relative;
 }
 
 .zoom-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   transition: transform 0.5s ease;
 }
 
@@ -36,28 +104,32 @@
   transform: scale(1.1);
 }
 
-/********* Cards ********/
+/* --------------------------
+   CARDS / QUICK-ADD / HEART
+---------------------------*/
 .card {
   border: none;
   text-align: center;
+  position: relative; /* para posicionar iconos absolute */
 }
+
 .card i.fa-heart {
   position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
   visibility: hidden;
-  top: 0;
-  right: 0;
-  transition: transform 0.5s ease;
   transform: translateX(15%);
+  transition: transform 0.25s ease, visibility 0.25s ease;
 }
+
 .card:hover i.fa-heart,
 .card:hover .quick-add {
   visibility: visible;
-  transform: translateX(0%);
-  transform: translateY(0%);
+  transform: translateX(0);
 }
+
 .quick-add {
   position: absolute;
-  visibility: hidden;
   bottom: 0;
   left: 0;
   right: 0;
@@ -66,6 +138,47 @@
   background-color: #fff;
   color: #000;
   font-weight: 700;
-  transition: transform 0.5s ease;
+  padding: 0.5rem 0;
+  transition: transform 0.25s ease, visibility 0.25s ease;
   transform: translateY(15%);
+  visibility: hidden;
+}
+
+/* --------------------------
+   RESPONSIVE
+   Ajustes para tablet y móvil
+---------------------------*/
+@media (max-width: 992px) {
+  .jumbotron-home {
+    height: 55vh;
+  }
+  .jumbotron-home h1 {
+    font-size: 3rem;
+  }
+  .jumbotron-home p {
+    font-size: 1.25rem;
+  }
+  .jumbotron-home .divider {
+    width: 50px;
+  }
+}
+
+@media (max-width: 576px) {
+  .jumbotron-home {
+    min-height: 360px;
+    height: 50vh;
+    padding: 1.25rem;
+  }
+  .jumbotron-home h1 {
+    font-size: 2.25rem;
+  }
+  .jumbotron-home p {
+    font-size: 1rem;
+  }
+  .jumbotron-home .divider {
+    width: 40px;
+  }
+  .button-black {
+    padding: 8px 16px;
+  }
 }

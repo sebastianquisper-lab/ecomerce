@@ -13,13 +13,12 @@ export const Home = () => {
     <div className="home">
       <div className="jumbotron-home ps-5">
         <div className="row d-flex justify-content-center text-center col-5 m-5 p-5">
-          <h1>ECOMMERCE</h1>
+          <h1>JamonX</h1>
           <div className="col-2 bold">
             <hr></hr>
           </div>
           <p>
-            Quisquemos sodales suscipit tortor ditaemcos condimentum de cosmo
-            lacus meleifend menean diverra loremous.
+            Style that defines you.
           </p>
           <div className="col-7">
             <Link to={"/catalogue/" + "allproducts"}>

@@ -87,7 +87,7 @@ export const Register = () => {
         <div className="col-7">
           <img
             className="cover-image"
-            src="https://cdn.shopify.com/s/files/1/0081/3305/0458/files/blog-details-lager-1.jpg?v=1646119289"
+            src="https://i.pinimg.com/736x/4d/90/d8/4d90d8983b0b415265fff2ad8249a8d8.jpg"
           />
         </div>
       </div>

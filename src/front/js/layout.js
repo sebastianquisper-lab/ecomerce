@@ -13,33 +13,48 @@ import injectContext from "./store/appContext";
 import { Navbar } from "./component/navbar";
 import { JumbotronNavBar } from "./component/jumbotronNavBar";
 import { Footer } from "./component/footer";
+import SupportWidget from "./component/SupportWidget";
+import { Checkout } from "./pages/checkout"; 
+
+
+
+// Importa tu CartProvider
+import { CartProvider } from "./store/CartContext";
+
 
 const Layout = () => {
-  //the basename is used when your project is published in a subdirectory and not in the root of the domain
-  // you can set the basename on the .env file located at the root of this project, E.g: BASENAME=/react-hello-webapp/
   const basename = process.env.BASENAME || "";
 
-  if (!process.env.BACKEND_URL || process.env.BACKEND_URL == "")
+  if (!process.env.BACKEND_URL || process.env.BACKEND_URL === "")
     return <BackendURL />;
 
   return (
-    <div>
-      <BrowserRouter basename={basename}>
-        <ScrollToTop>
-          <Navbar />
-          <JumbotronNavBar />
-          <Routes>
-            <Route element={<Home />} path="/" />
-            <Route element={<Favorites />} path="/favorites" />
-            <Route element={<Register />} path="/register" />
-            <Route element={<Catalogue />} path="/catalogue/:theid" />
-            <Route element={<ProductDetails />} path="/productDetails/:theid" />
-            <Route element={<h1>Not found!</h1>} />
-          </Routes>
-          <Footer />
-        </ScrollToTop>
-      </BrowserRouter>
-    </div>
+    // Envuelve todo en CartProvider
+    <CartProvider>
+      <div>
+        <BrowserRouter basename={basename}>
+          <ScrollToTop>
+            <Navbar />
+            <JumbotronNavBar />
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/catalogue/:theid" element={<Catalogue />} />
+              <Route path="/productDetails/:theid" element={<ProductDetails />} />
+              <Route path="/checkout" element={<Checkout />} />
+
+          
+              <Route path="*" element={<h1>Not found!</h1>} />
+            </Routes>
+            <Footer />
+          </ScrollToTop>
+
+          {/* Widget flotante */}
+          <SupportWidget defaultCreatorEmail={""} />
+        </BrowserRouter>
+      </div>
+    </CartProvider>
   );
 };
 

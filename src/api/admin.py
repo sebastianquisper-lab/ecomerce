@@ -2,6 +2,8 @@ import os
 from flask_admin import Admin
 from .models import db, User, Product, Collection, Color, Size, Stock, Favorites, Order
 from flask_admin.contrib.sqla import ModelView
+from .models import SupportTicket, Message
+
 
 def setup_admin(app):
     app.secret_key = os.environ.get('FLASK_APP_KEY', 'sample key')
@@ -11,11 +13,8 @@ def setup_admin(app):
     
     # Customize the ModelView for the User model
     class UserAdminModelView(ModelView):
-        column_list = ('id', 'name', 'email', 'password', 'favorites', 'orders')  # Include favorites and orders columns
-        column_labels = {
-            'favorites': 'Favorites',  # Rename the column label if desired
-            'orders': 'Orders'
-        }
+        column_list = ('id', 'name', 'last_name', 'email', 'password', 'role', 'address', 'country', 'favorites', 'orders')
+        form_columns = ('name', 'last_name', 'email', 'password', 'role', 'address', 'country')
 
     admin.add_view(UserAdminModelView(User, db.session))
     admin.add_view(ModelView(Product, db.session))
@@ -25,3 +24,6 @@ def setup_admin(app):
     admin.add_view(ModelView(Stock, db.session))
     admin.add_view(ModelView(Favorites, db.session))
     admin.add_view(ModelView(Order, db.session))
+    admin.add_view(ModelView(SupportTicket, db.session, category="Tickets"))
+    admin.add_view(ModelView(Message, db.session, category="Tickets"))
+

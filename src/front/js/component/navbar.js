@@ -1,7 +1,9 @@
+// src/front/js/component/navbar.js
 import React, { useState, useEffect, useContext } from "react";
 import { Navbar1 } from "./navbar1";
 import { Navbar2 } from "./navbar2";
-import { Context } from "../store/appContext";
+import { Context } from "../store/appContext"; // <-- ruta corregida, usa appContext
+import { useLocation } from "react-router-dom";
 
 const useLoginStatus = () => {
   const [isLogin, setIsLogin] = useState(false);
@@ -10,7 +12,7 @@ const useLoginStatus = () => {
     if (sessionStorage.getItem("token")) {
       setIsLogin(true);
     }
-  }, [isLogin]);
+  }, []);
 
   return { isLogin, setIsLogin };
 };
@@ -18,6 +20,7 @@ const useLoginStatus = () => {
 export const Navbar = () => {
   const { store, actions } = useContext(Context);
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const location = useLocation();
 
   // Function to update screen width state on window resize
   const handleResize = () => {
@@ -25,13 +28,8 @@ export const Navbar = () => {
   };
 
   useEffect(() => {
-    // Add event listener to update screen width on window resize
     window.addEventListener("resize", handleResize);
-
-    // Clean up the event listener on component unmount
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const { isLogin, setIsLogin } = useLoginStatus();
@@ -44,6 +42,7 @@ export const Navbar = () => {
           actions={actions}
           isLogin={isLogin}
           setIsLogin={setIsLogin}
+          location={location}
         />
       ) : (
         <Navbar2
@@ -51,8 +50,11 @@ export const Navbar = () => {
           actions={actions}
           isLogin={isLogin}
           setIsLogin={setIsLogin}
+          location={location}
         />
       )}
     </div>
   );
 };
+
+export default Navbar;
